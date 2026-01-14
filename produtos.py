@@ -95,8 +95,9 @@ FINAL_COLUMNS_ADSNET = [
     "ncm", "cest", "estoque", "unidade", "fator_cv", "muv", "localizacao",
     "descricao2", "divisao_id", "fornece", "fornec_id", "trib_icms", "cst",
     "csosn", "aliq_icms", "pFCP", "pauta", "cicms", "cIpi", "cst_pis",
-    "cst_cofins", "origem", "pesobr", "u_nota", "ccompra", "cmedio",
-    "prvenda", "comissao", "unidade2", "dun14", "pno"
+    "cst_cofins", "aliq_pis", "aliq_cofins", "origem", "pesobr",
+    "u_nota", "ccompra", "cmedio", "prvenda", "comissao", "unidade2", 
+    "dun14", "pno", "CST_ibs_cbs", "cClassTrib_ibs_cbs"
 ]
 
 # ---------------------- Classe de tratamento (sem GUI) ----------------------

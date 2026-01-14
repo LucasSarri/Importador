@@ -9,13 +9,22 @@ import os
 # ---------------------- Helpers / Tratamento de dados ----------------------
 
 def get_numbers_from_string(s):
-    """Extrai apenas os dígitos de uma string. Retorna '' se vazio ou somente zeros."""
+    """
+    Extrai apenas os dígitos de uma string.
+    Remove zero extra gerado por '.0' de números vindos do Excel.
+    """
     try:
         s = str(s)
     except:
         return ''
+
+    # remove .0 final típico do Excel
+    if s.endswith('.0'):
+        s = s[:-2]
+
     numbers = re.findall(r'\d+', s)
     texto = ''.join(numbers)
+
     if texto == "":
         return ""
     if all(caractere == '0' for caractere in texto):
@@ -54,7 +63,7 @@ SUGGESTED_MASK = {
 FINAL_COLUMNS = [
     'cliente_id', 'cnpj_cpf', 'cpf', 'ie', 'nome', 'fantasia', 'fone', 'endereco', 'numero',
     'bairro', 'cidade', 'ibge', 'uf', 'cep', 'email', 'email_danfe', 'classe_id', 'repr_id',
-    'fone2', 'complemento', 'ncompr', 'rota_id', 'rota', 'consumidor_final', 'Observacao'
+    'fone2', 'complemento', 'ncompr', 'rota_id', 'rota', 'consumidor_final', 'observacao'
 ]
 
 # ---------------------- Classe de processamento (sem GUI) ----------------------
@@ -193,7 +202,7 @@ class ClientesGUI:
 
     def _select_file(self):
         path = filedialog.askopenfilename(title="Selecione a planilha de clientes",
-                                          filetypes=[("Excel Files", "*.xlsx *.xls"), ("CSV Files", "*.csv")])
+                                          filetypes=[("Excel Files", "*.xlsx"), ("CSV Files", ".csv")])
         if path:
             self.filepath = path
             self.file_label.config(text=self.filepath)
@@ -227,12 +236,13 @@ class ClientesGUI:
         for widget in self.root.winfo_children():
             widget.destroy()
 
-        ttk.Label(self.root, text="Etapa 2 — Mapear colunas (deixe em branco para IGNORAR)", font=("Arial", 13)).pack(pady=6)
+        ttk.Label(self.root, text="Etapa 2 — Mapear colunas (selecione o destino ou deixe em branco para IGNORAR)",
+                  font=("Arial", 13)).pack(pady=6)
 
         container = ttk.Frame(self.root)
         container.pack(fill='both', expand=True, padx=8, pady=8)
 
-        # Scrollable canvas for many columns
+        # Scrollable area
         canvas = tk.Canvas(container)
         vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
         hsb = ttk.Scrollbar(container, orient="horizontal", command=canvas.xview)
@@ -250,45 +260,61 @@ class ClientesGUI:
         vsb.pack(side="right", fill="y")
         hsb.pack(side="bottom", fill="x")
 
-        self.column_entries = {}  # original_col -> Entry widget
+        self.column_combos = {}  # original_col → Combobox widget
 
-        # header
+        # Cabeçalho
         hdr = ttk.Frame(scroll_frame)
         hdr.grid(row=0, column=0, sticky='ew', pady=2)
         ttk.Label(hdr, text="Coluna original", width=50).grid(row=0, column=0, padx=2)
-        ttk.Label(hdr, text="Nome destino (deixe em branco para IGNORAR)", width=50).grid(row=0, column=1, padx=2)
+        ttk.Label(hdr, text="Mapear para coluna destino", width=50).grid(row=0, column=1, padx=2)
 
-        for idx, col in enumerate(self.df_original.columns, start=1):
-            lbl = ttk.Label(scroll_frame, text=str(col), width=50, anchor='w')
+        # Lista ordenada das colunas finais (para o combobox)
+        final_options = [""] + FINAL_COLUMNS  # "" = ignorar
+
+        for idx, orig_col in enumerate(self.df_original.columns, start=1):
+            lbl = ttk.Label(scroll_frame, text=str(orig_col), width=50, anchor='w')
             lbl.grid(row=idx, column=0, padx=2, pady=2, sticky='w')
 
-            # sugestão de rename: se estiver em SUGGESTED_MASK, usar; senão pegar nome simplificado
-            sugest = self.suggested_mask.get(col, col)
-            ent = ttk.Entry(scroll_frame, width=50)
-            ent.insert(0, sugest)
-            ent.grid(row=idx, column=1, padx=2, pady=2, sticky='w')
-            self.column_entries[col] = ent
+            # Combobox com as opções finais + vazio (ignorar)
+            combo = ttk.Combobox(scroll_frame, values=final_options, width=48, state="readonly")
+            
+            # Tentar sugerir o mapeamento automaticamente
+            sugestao = self.suggested_mask.get(orig_col, None)
+            if sugestao in FINAL_COLUMNS:
+                combo.current(final_options.index(sugestao))
+            elif sugestao and sugestao.lower() in [c.lower() for c in FINAL_COLUMNS]:
+                # tenta achar case-insensitive
+                for i, opt in enumerate(final_options):
+                    if opt.lower() == sugestao.lower():
+                        combo.current(i)
+                        break
+            else:
+                combo.current(0)  # seleciona "" (ignorar)
 
+            combo.grid(row=idx, column=1, padx=2, pady=2, sticky='w')
+            self.column_combos[orig_col] = combo
+
+        # Botões
         btn_frame = ttk.Frame(self.root)
-        btn_frame.pack(fill='x', pady=8)
+        btn_frame.pack(fill='x', pady=12)
         ttk.Button(btn_frame, text="← Voltar", command=self._build_step1).pack(side='left', padx=6)
         ttk.Button(btn_frame, text="Avançar →", command=self._process_step2).pack(side='right', padx=6)
 
     def _process_step2(self):
-        # Build rename_map and ignored list: agora campo em branco = ignorar
         rename_map = {}
         ignored = set()
-        for orig, ent in self.column_entries.items():
-            val = ent.get().strip()
-            if val == "":
-                ignored.add(orig)
-            else:
-                rename_map[orig] = val
 
-        # aplicar renome temporariamente
+        for orig_col, combo in self.column_combos.items():
+            destino = combo.get().strip()
+            if destino == "":
+                ignored.add(orig_col)
+            else:
+                rename_map[orig_col] = destino
+
+        # Aplicar renomeação
         df = self.df_original.rename(columns=rename_map).copy()
 
-        # remover colunas ignoradas (usando orig names)
+        # Remover colunas ignoradas
         df.drop(columns=list(ignored), inplace=True, errors='ignore')
 
         self.df_mapped = df

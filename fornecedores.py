@@ -41,9 +41,8 @@ DEFAULT_REPLACER_MASK = {
 }
 
 FINAL_COLUMNS_FORNECEDORES = [
-    "fornecedor_id", "cnpj_cpf", "ie", "razao", "fantasia", "fone", "fone2", "email",
-    "email_nfe", "endereco", "numero", "complemento", "bairro",
-    "cidade", "uf", "cep", "ibge", "contato", "observacao"
+    "fornec_id", "cnpj_cpf", "cpf", "ie", "nome", "fantasia", "telefone", "telefone2", "email",
+    "endereco", "numero", "complemento", "bairro", "cidade", "uf", "cep", "ibge", "site", "observacao"
 ]
 
 
